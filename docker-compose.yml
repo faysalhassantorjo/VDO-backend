@@ -1,0 +1,78 @@
+services:
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    
+  
+  #  APP layer
+  api:
+    build: ./api
+    container_name: api
+    # command: daphne -b 0.0.0.0 -p 8000 config.asgi:application
+    command: python manage.py runserver 0.0.0.0:8000
+
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+    
+    depends_on:
+      - redis
+
+  celery_worker:
+    build:
+      context: ./api
+      dockerfile: ../Dockerfile.worker
+    command: sh -c "sleep 5 && celery -A config worker -l info"
+    depends_on:
+      - redis
+    volumes:
+      - ./api:/app
+      - ./media:/app/media
+    restart: always
+
+  celery_beat:
+    build:
+      context: ./api
+      dockerfile: ../Dockerfile.worker
+    command: sh -c "sleep 5 && celery -A config beat -l info"
+    depends_on:
+      - redis
+    
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/1
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    restart: always
+  
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: rabbitmq
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    volumes:
+      - ./rabbitmq_vdo:/var/lib/rabbitmq_vdo/
+    restart: always
+
+  notification_worker:
+    build:
+      context: ./notification_worker
+
+    command: sh -c "sleep 5 && python consumer.py"
+    depends_on:
+      - rabbitmq
+    volumes:
+      - ./notification_worker:/worker
+      - ./api:/app
+    working_dir: /worker
+    restart: always
+
+volumes:
+  rabbitmq_vdo:
+  
+  

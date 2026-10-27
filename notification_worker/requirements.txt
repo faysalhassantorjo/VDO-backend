@@ -1,0 +1,13 @@
+Django
+django-rest-framework
+Pillow
+celery
+django-celery-beat
+redis
+daphne
+whitenoise
+django-cors-headers
+channels
+channels-redis
+pika
+asgiref
